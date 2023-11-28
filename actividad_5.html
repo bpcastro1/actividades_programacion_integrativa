@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Explorador de Galaxias</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: black;
+      color: white;
+    }
+
+    galaxy-viewer {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    #planet-info-container {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 1;
+    }
+
+    #planet-info {
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 15px;
+      border-radius: 10px;
+      text-align: center;
+      color: white;
+    }
+
+    #explore-btn {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://threejs.org/build/three.js"></script>
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+  <script>
+    class PlanetInfo extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+        this.shadowRoot.innerHTML = `
+          <div id="planet-info">
+            <h3 class="mb-3">Información del Planeta</h3>
+            <p><strong>Nombre:</strong> <slot name="name"></slot></p>
+            <p><strong>Tamaño:</strong> <slot name="size"></slot></p>
+          </div>
+        `;
+      }
+    }
+
+    class StellarBody extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+        this.shadowRoot.innerHTML = `
+          <div id="stellar-body">
+            <slot></slot>
+          </div>
+        `;
+        this.name = this.getAttribute('name') || 'Stellar Body';
+        this.initEvents();
+      }
+
+      initEvents() {
+        this.addEventListener('click', () => {
+          alert(`Clic en ${this.name}`);
+        });
+      }
+    }
+
+    class GalaxyViewer extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+        this.shadowRoot.innerHTML = `
+          <div id="scene"></div>
+          <div id="planet-info-container">
+            <slot name="stellar-body"></slot>
+            <button id="explore-btn" class="btn btn-warning" style="position: relative;right: 400px;" >Explorar más planetas</button>
+          </div>
+        `;
+        this.initThree();
+      }
+
+      initThree() {
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        this.shadowRoot.getElementById('scene').appendChild(renderer.domElement);
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsMaterial = new THREE.PointsMaterial({ color: 0xFFFFFF, size: 0.1 });
+
+        const starsVertices = [];
+        for (let i = 0; i < 5000; i++) {
+          const x = (Math.random() - 0.5) * 2000;
+          const y = (Math.random() - 0.5) * 2000;
+          const z = (Math.random() - 0.5) * 2000;
+          starsVertices.push(x, y, z);
+        }
+
+        starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
+        const stars = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(stars);
+        const sunGeometry = new THREE.SphereGeometry(20, 64, 64);
+        const sunMaterial = new THREE.MeshStandardMaterial({
+          color: 0xFDB813,
+          emissive: 0xFDB813,
+          emissiveIntensity: 2,
+          metalness: 0.5,
+          roughness: 0.2,
+        });
+
+        const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+        scene.add(sun);
+        const sunLight1 = new THREE.PointLight(0xFF0000, 1, 100);
+        const sunLight2 = new THREE.PointLight(0xFFFF00, 1, 100);
+        const sunLight3 = new THREE.PointLight(0xFFFFFF, 1, 100);
+        sunLight1.position.set(-50, 0, 0);
+        sunLight2.position.set(-50, 0, 0);
+        sunLight3.position.set(-50, 0, 0);
+        scene.add(sunLight1);
+        scene.add(sunLight2);
+        scene.add(sunLight3);
+        const smallSpheres = [];
+        const smallSpheresCount = 15;
+        for (let i = 0; i < smallSpheresCount; i++) {
+          const smallSphereGeometry = new THREE.SphereGeometry(Math.random() * 5 + 2, 16, 16);
+          const smallSphereMaterial = new THREE.MeshStandardMaterial({ color: getRandomColor(), shininess: 100 });
+          const smallSphere = new THREE.Mesh(smallSphereGeometry, smallSphereMaterial);
+          const angle = Math.random() * Math.PI * 2;
+          const radius = Math.random() * 50 + 30;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          smallSphere.position.set(x, y, 0);
+          scene.add(smallSphere);
+          smallSpheres.push(smallSphere);
+          const orbitSpeed = Math.random() * 0.02 + 0.005;
+          smallSphere.orbitRadius = radius;
+          smallSphere.orbitAngle = angle;
+          smallSphere.orbitSpeed = orbitSpeed;
+        }
+        camera.position.z = 150;
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 0.5);
+        scene.add(directionalLight);
+        const animate = function () {
+          requestAnimationFrame(animate);
+          stars.rotation.x += 0.001;
+          stars.rotation.y += 0.001;
+          sun.rotation.x += 0.005;
+          sun.rotation.y += 0.005;
+          smallSpheres.forEach(smallSphere => {
+            smallSphere.orbitAngle += smallSphere.orbitSpeed;
+            const x = Math.cos(smallSphere.orbitAngle) * smallSphere.orbitRadius;
+            const y = Math.sin(smallSphere.orbitAngle) * smallSphere.orbitRadius;
+            smallSphere.position.set(x, y, 0);
+            smallSphere.rotation.x += 0.01;
+            smallSphere.rotation.y += 0.01;
+          });
+
+          renderer.render(scene, camera);
+        };
+
+        animate();
+        const exploreBtn = this.shadowRoot.getElementById('explore-btn');
+        exploreBtn.addEventListener('click', () => {
+          alert('Explorando más planetas...');
+        });
+      }
+    }
+
+    function getRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    customElements.define('planet-info', PlanetInfo);
+    customElements.define('stellar-body', StellarBody);
+    customElements.define('galaxy-viewer', GalaxyViewer);
+  </script>
+  <galaxy-viewer>
+    <stellar-body slot="stellar-body" name="Sol" style="position: relative;right: 400px;">
+      <planet-info>
+        <span slot="name">Sol</span>
+        <span slot="size">Mediano</span>
+      </planet-info>
+    </stellar-body>
+  </galaxy-viewer>
+</body>
+</html>
